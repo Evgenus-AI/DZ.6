@@ -1,70 +1,81 @@
 ﻿using System;
 
-// --- 3.1: перечисление видов счёта ---
-enum AccountType
+class Building
 {
-    Current,   // текущий (= 0)
-    Savings    // сберегательный (= 1)
-}
-
-class BankAccount
-{
-    // --- 7.2: статическое поле, одно на весь класс (общий счётчик номеров) ---
+    // Статическое поле: хранит номер, который выдадим следующему зданию.
+    // Одно на весь класс, а не на каждый объект
     private static int nextNumber = 1;
 
-    // --- 7.1: закрытые поля (camelCase, без подчёркивания, как в курсе) ---
-    private int accountNumber;
-    private decimal balance;      // decimal для денег: точнее, чем double
-    private AccountType type;
+    // Закрытые поля
+    private int buildingNumber;   // уникальный номер (генерируется сам)
+    private double height;        // высота здания в метрах (может быть дробной)
+    private int floors;           // этажность
+    private int apartments;       // всего квартир
+    private int entrances;        // подъездов
 
-    // --- 7.2: статический метод, увеличивает счётчик ---
-    // Постфиксный ++: сначала вернётся текущее значение, потом счётчик вырастет
+    // Статический метод: выдаёт новый номер и увеличивает счётчик.
+    // private, чтобы снаружи нельзя было "сжечь" номера
     private static int GenerateNumber()
     {
-        return nextNumber++;
+        return nextNumber++;      // сначала вернём текущее, потом +1
     }
 
-    // --- 7.1: метод заполнения ---
-    // Номер не передаём: он генерируется сам (7.2).
-    // this.balance - поле объекта, balance - параметр метода. this их различает
-    public void Fill(decimal balance, AccountType type)
+    // Метод заполнения. Номер сюда не передаём: он генерируется программно
+    public void Fill(double height, int floors, int apartments, int entrances)
     {
-        this.accountNumber = GenerateNumber();
-        this.balance = balance;
-        this.type = type;
+        this.buildingNumber = GenerateNumber();
+        this.height = height;
+        this.floors = floors;
+        this.apartments = apartments;
+        this.entrances = entrances;
     }
 
-    // --- 7.1: методы чтения (геттеры) ---
-    public int GetAccountNumber() { return accountNumber; }
-    public decimal GetBalance() { return balance; }
-    public AccountType GetAccountType() { return type; }
+    // Методы получения значений полей (геттеры)
+    public int GetBuildingNumber() { return buildingNumber; }
+    public double GetHeight() { return height; }
+    public int GetFloors() { return floors; }
+    public int GetApartments() { return apartments; }
+    public int GetEntrances() { return entrances; }
 
-    // --- 7.3: положить на счёт ---
-    // Возвращает true, если операция прошла, и false, если сумма некорректна
-    public bool Deposit(decimal amount)
+    // Высота одного этажа = высота здания / этажность.
+    // Высота double, поэтому деление дробное, ничего не теряется
+    public double GetFloorHeight()
     {
-        if (amount <= 0)
-            return false;
-
-        balance += amount;
-        return true;
+        if (floors == 0)
+            return 0;             // защита от деления на ноль
+        return height / floors;
     }
 
-    // --- 7.3: снять со счёта ---
-    // Сначала проверяем, можно ли снять, и только потом меняем баланс
-    public bool Withdraw(decimal amount)
+    // Квартир в одном подъезде = всего квартир / подъездов.
+    // (double) - явное приведение: без него int / int даст целое
+    // и отбросит дробную часть (например, 7 / 2 = 3, а не 3,5)
+    public double GetApartmentsPerEntrance()
     {
-        if (amount <= 0 || amount > balance)
-            return false;         // денег не хватает - баланс не трогаем
-
-        balance -= amount;
-        return true;
+        if (entrances == 0)
+            return 0;
+        return (double)apartments / entrances;
     }
 
-    // --- 7.1: вывод информации об объекте ---
+    // Квартир на одном этаже = всего квартир / (подъезды * этажи).
+    // Предполагаем, что каждый подъезд идёт по всем этажам
+    public double GetApartmentsPerFloor()
+    {
+        if (entrances == 0 || floors == 0)
+            return 0;
+        return (double)apartments / (entrances * floors);
+    }
+
+    // Печать всей информации о здании
     public void Print()
     {
-        Console.WriteLine("Счёт №{0}, тип: {1}, баланс: {2}", accountNumber, type, balance);
+        Console.WriteLine("Здание №{0}", buildingNumber);
+        Console.WriteLine("Высота: {0} м, этажей: {1}", height, floors);
+        Console.WriteLine("Квартир: {0}, подъездов: {1}", apartments, entrances);
+        // {0:F2} - вывести число с двумя знаками после запятой
+        Console.WriteLine("Высота этажа: {0:F2} м", GetFloorHeight());
+        Console.WriteLine("Квартир в подъезде: {0:F2}", GetApartmentsPerEntrance());
+        Console.WriteLine("Квартир на этаже: {0:F2}", GetApartmentsPerFloor());
+        Console.WriteLine();
     }
 }
 
@@ -72,23 +83,14 @@ class Program
 {
     static void Main()
     {
-        // 7.1: создаём объект, заполняем, печатаем
-        BankAccount acc1 = new BankAccount();
-        acc1.Fill(1000m, AccountType.Current);
+        Building b1 = new Building();
+        b1.Fill(45.5, 15, 180, 3);
 
-        // 7.2: второй счёт получит следующий номер автоматически
-        BankAccount acc2 = new BankAccount();
-        acc2.Fill(500m, AccountType.Savings);
+        // Второе здание автоматически получит номер 2
+        Building b2 = new Building();
+        b2.Fill(27, 9, 72, 2);
 
-        acc1.Print();   // Счёт №1, тип: Current, баланс: 1000
-        acc2.Print();   // Счёт №2, тип: Savings, баланс: 500
-
-        // 7.3: проверка снятия и пополнения
-        Console.WriteLine(acc1.Withdraw(300m));    // True
-        Console.WriteLine(acc1.Withdraw(5000m));   // False (не хватает денег)
-        Console.WriteLine(acc1.Deposit(200m));     // True
-        Console.WriteLine(acc1.Deposit(-50m));     // False (отрицательная сумма)
-
-        acc1.Print();   // Счёт №1, тип: Current, баланс: 900
+        b1.Print();
+        b2.Print();
     }
 }
