@@ -1,11 +1,15 @@
-﻿// Тема: «Типы сотрудников»
+﻿// Лабораторная работа: ООП на C#
+// Тема: «Типы сотрудников»
+// Используется только то, что есть в курсе: классы, свойства, наследование,
+// enum, кортежи, List, StringBuilder, switch/case, TryParse, try/catch.
+
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace EmployeeTypes;
-
-
+// ============================================================
+// Перечисление (enum) — набор именованных констант.
+// ============================================================
 public enum Grade
 {
     Junior,
@@ -30,17 +34,18 @@ public abstract class Employee
     private string _department = "";
     private decimal _salary;
 
-    // Список задач: кортеж (Title, Hours). Хранится приватно,
-    // наружу отдаём только копию «для чтения».
-    private readonly List<(string Title, int Hours)> _tasks = new();
+    // Список задач: кортеж (Title, Hours) — название и часы.
+    private List<(string Title, int Hours)> _tasks = new List<(string Title, int Hours)>();
 
     // ---------- СВОЙСТВА ----------
-    
+
+    // Только чтение: задаётся один раз в конструкторе, потом менять нельзя.
     public int Id { get; }
-    
+
+    // Чтение и запись С ПРОВЕРКОЙ (вот зачем свойства, а не публичные поля).
     public string FullName
     {
-        get => _fullName;
+        get { return _fullName; }
         set
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -52,7 +57,7 @@ public abstract class Employee
     // Чтение и запись
     public string Department
     {
-        get => _department;
+        get { return _department; }
         set
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -65,7 +70,7 @@ public abstract class Employee
     // decimal — тип для денег (в отличие от double не копит ошибки округления).
     public decimal Salary
     {
-        get => _salary;
+        get { return _salary; }
         set
         {
             if (value <= 0)
@@ -74,16 +79,19 @@ public abstract class Employee
         }
     }
 
-    // Только чтение, и ещё АБСТРАКТНОЕ: каждый наследник обязан сам сказать, кто он.
+    // Только чтение и АБСТРАКТНОЕ: каждый наследник обязан сам сказать, кто он.
     public abstract string Position { get; }
 
     // Только чтение, виртуальное: по умолчанию 40 часов, наследники могут изменить.
-    public virtual int WeeklyHours => 40;
+    public virtual int WeeklyHours
+    {
+        get { return 40; }
+    }
 
     // get публичный, set приватный: читать может любой, менять — только сам класс.
     public int CompletedTasks { get; private set; }
 
-    // Вычисляемые свойства (без поля, считаются на лету) — только чтение.
+    // Вычисляемое свойство (без своего поля, считается на лету) — только чтение.
     public int TotalHours
     {
         get
@@ -95,16 +103,29 @@ public abstract class Employee
         }
     }
 
-    public double WorkloadPercent =>
-        WeeklyHours == 0 ? 0 : (double)TotalHours / WeeklyHours * 100;
+    public double WorkloadPercent
+    {
+        get
+        {
+            if (WeeklyHours == 0) return 0;
+            return (double)TotalHours / WeeklyHours * 100;
+        }
+    }
 
-    public IReadOnlyList<(string Title, int Hours)> Tasks => _tasks;
+    // Отдаём КОПИЮ списка: если вернуть сам _tasks, снаружи его можно было бы
+    // менять в обход наших проверок (а это нарушение инкапсуляции).
+    public List<(string Title, int Hours)> Tasks
+    {
+        get { return new List<(string Title, int Hours)>(_tasks); }
+    }
 
     // ---------- КОНСТРУКТОР ----------
     // protected: вызвать его можно только из наследников (через : base(...)).
     protected Employee(string fullName, string department, decimal salary)
     {
-        Id = _nextId++;
+        Id = _nextId;
+        _nextId++;
+        // Присваиваем через СВОЙСТВА, чтобы сработали проверки.
         FullName = fullName;
         Department = department;
         Salary = salary;
@@ -116,7 +137,7 @@ public abstract class Employee
     public abstract decimal CalculateBonus();
 
     // 2) virtual — реализация по умолчанию, которую можно переопределить (override).
-    //    Формула из ТК РФ (упрощённо): средний дневной заработок = оклад / 29,3.
+    //    Упрощённая формула: средний дневной заработок = оклад / 29,3.
     public virtual decimal CalculateVacationPay(int days)
     {
         if (days <= 0)
@@ -161,7 +182,8 @@ public abstract class Employee
     // 5) Показать нагрузку. virtual, чтобы наследники могли дописать своё.
     public virtual void ShowWorkload()
     {
-        int filled = Math.Min(10, (int)Math.Round(WorkloadPercent / 10));
+        int filled = (int)Math.Round(WorkloadPercent / 10);
+        if (filled > 10) filled = 10;
         string bar = new string('#', filled) + new string('.', 10 - filled);
         Console.WriteLine($"   {FullName} ({Position}): {TotalHours}/{WeeklyHours} ч [{bar}] {WorkloadPercent:F0}%");
         foreach (var task in _tasks)
@@ -169,8 +191,10 @@ public abstract class Employee
     }
 
     // 6) Краткая информация о сотруднике.
-    public virtual string GetInfo() =>
-        $"#{Id} {FullName}, {Position}, отдел «{Department}», оклад {Money(Salary)}";
+    public virtual string GetInfo()
+    {
+        return $"#{Id} {FullName}, {Position}, отдел «{Department}», оклад {Money(Salary)}";
+    }
 
     // 7) Повысить оклад на процент.
     public void RaiseSalary(decimal percent)
@@ -180,12 +204,18 @@ public abstract class Employee
         Salary = Math.Round(Salary * (1 + percent / 100m), 2);
     }
 
-    // 8) Строка для отчёта по отделам.
-    public string GetReportLine() =>
-        $"{FullName,-28} {Position,-12} {Money(Salary),12} {WorkloadPercent,5:F0}%";
+    // 8) Строка для отчёта по отделам. PadRight/PadLeft дополняют строку пробелами до нужной ширины.
+    public string GetReportLine()
+    {
+        return FullName.PadRight(28) + " " + Position.PadRight(12) + " " +
+               Money(Salary).PadLeft(12) + " " + WorkloadPercent.ToString("F0").PadLeft(4) + "%";
+    }
 
-    // Статический помощник: форматирует деньги. static — вызывается как Employee.Money(...)
-    public static string Money(decimal value) => $"{value:N0} ₽";
+    // Статический помощник: форматирует деньги. Вызывается как Employee.Money(...)
+    public static string Money(decimal value)
+    {
+        return value.ToString("N0") + " ₽";
+    }
 }
 
 // ============================================================
@@ -193,15 +223,18 @@ public abstract class Employee
 // ============================================================
 public class Manager : Employee
 {
-    private readonly List<Employee> _team = new();
+    private List<Employee> _team = new List<Employee>();
     private int _meetingHoursPerWeek;
 
-    public override string Position => "Менеджер";
+    public override string Position
+    {
+        get { return "Менеджер"; }
+    }
 
     // Чтение и запись с проверкой
     public int MeetingHoursPerWeek
     {
-        get => _meetingHoursPerWeek;
+        get { return _meetingHoursPerWeek; }
         set
         {
             if (value < 0 || value > 30)
@@ -211,11 +244,22 @@ public class Manager : Employee
     }
 
     // Совещания «съедают» рабочее время менеджера -> меньше часов на задачи.
-    public override int WeeklyHours => base.WeeklyHours - MeetingHoursPerWeek;
+    public override int WeeklyHours
+    {
+        get { return base.WeeklyHours - MeetingHoursPerWeek; }
+    }
 
     // Только чтение
-    public int TeamSize => _team.Count;
-    public IReadOnlyList<Employee> Team => _team;
+    public int TeamSize
+    {
+        get { return _team.Count; }
+    }
+
+    // Копия списка — по той же причине, что и у Tasks
+    public List<Employee> Team
+    {
+        get { return new List<Employee>(_team); }
+    }
 
     // КОНСТРУКТОР 1: базовый (встречи по умолчанию 10 ч)
     // : base(...) — вызываем конструктор родителя, он заполнит ФИО, отдел, оклад.
@@ -236,16 +280,21 @@ public class Manager : Employee
     // Премия: 20% + 2% за каждого подчинённого, но не больше 40%.
     public override decimal CalculateBonus()
     {
-        decimal rate = Math.Min(0.40m, 0.20m + 0.02m * TeamSize);
+        decimal rate = 0.20m + 0.02m * TeamSize;
+        if (rate > 0.40m) rate = 0.40m;
         return Math.Round(Salary * rate, 2);
     }
 
     // Отпускные: считаем как у всех (base), плюс 10% надбавка (упрощённая учебная модель).
-    public override decimal CalculateVacationPay(int days) =>
-        Math.Round(base.CalculateVacationPay(days) * 1.10m, 2);
+    public override decimal CalculateVacationPay(int days)
+    {
+        return Math.Round(base.CalculateVacationPay(days) * 1.10m, 2);
+    }
 
-    public override string GetInfo() =>
-        base.GetInfo() + $", подчинённых: {TeamSize}";
+    public override string GetInfo()
+    {
+        return base.GetInfo() + $", подчинённых: {TeamSize}";
+    }
 
     public override void ShowWorkload()
     {
@@ -281,7 +330,10 @@ public class Manager : Employee
 // ============================================================
 public class Developer : Employee
 {
-    public override string Position => "Разработчик";
+    public override string Position
+    {
+        get { return "Разработчик"; }
+    }
 
     // Чтение и запись
     public string Language { get; set; }
@@ -303,22 +355,34 @@ public class Developer : Employee
     {
         Grade = grade;
     }
-    
+
+    // Процент премии зависит от уровня — выбираем через switch.
     public override decimal CalculateBonus()
     {
-        decimal rate = Grade switch
+        decimal rate = 0m;
+        switch (Grade)
         {
-            Grade.Junior => 0.10m,
-            Grade.Middle => 0.15m,
-            Grade.Senior => 0.25m,
-            _ => 0m
-        };
+            case Grade.Junior:
+                rate = 0.10m;
+                break;
+            case Grade.Middle:
+                rate = 0.15m;
+                break;
+            case Grade.Senior:
+                rate = 0.25m;
+                break;
+            default:
+                rate = 0m;
+                break;
+        }
         // Плюс 1000 ₽ за каждую закрытую задачу.
         return Math.Round(Salary * rate + 1000m * CompletedTasks, 2);
     }
 
-    public override string GetInfo() =>
-        base.GetInfo() + $", язык: {Language}, уровень: {Grade}";
+    public override string GetInfo()
+    {
+        return base.GetInfo() + $", язык: {Language}, уровень: {Grade}";
+    }
 
     public override void ShowWorkload()
     {
@@ -326,8 +390,10 @@ public class Developer : Employee
         Console.WriteLine($"      (стек: {Language}, уровень {Grade})");
     }
 
-    public void WriteCode(string feature) =>
+    public void WriteCode(string feature)
+    {
         Console.WriteLine($"   {FullName} пишет «{feature}» на {Language}...");
+    }
 
     // Принимаем другого Developer: ревью кода — типичная задача разработчика.
     public void DoCodeReview(Developer author)
@@ -342,7 +408,12 @@ public class Developer : Employee
     public bool Promote()
     {
         if (Grade == Grade.Senior) return false;
-        Grade = Grade + 1;      // у enum под капотом числа, поэтому +1 работает
+
+        if (Grade == Grade.Junior)
+            Grade = Grade.Middle;
+        else
+            Grade = Grade.Senior;
+
         RaiseSalary(15);
         return true;
     }
@@ -355,15 +426,18 @@ public class Intern : Employee
 {
     private int _internshipMonths;
 
-    public override string Position => "Стажёр";
+    public override string Position
+    {
+        get { return "Стажёр"; }
+    }
 
-    // Наставник — любой Employee (опять полиморфизм). ? значит «может быть null».
-    public Employee? Mentor { get; set; }
+    // Наставник — любой Employee (опять полиморфизм). Может быть null — тогда наставника нет.
+    public Employee Mentor { get; set; }
 
     // Чтение и запись с проверкой
     public int InternshipMonths
     {
-        get => _internshipMonths;
+        get { return _internshipMonths; }
         set
         {
             if (value < 1 || value > 12)
@@ -373,7 +447,10 @@ public class Intern : Employee
     }
 
     // У стажёра неполный день.
-    public override int WeeklyHours => 20;
+    public override int WeeklyHours
+    {
+        get { return 20; }
+    }
 
     // КОНСТРУКТОР 1: срок по умолчанию — 3 месяца
     public Intern(string fullName, string department, decimal salary, Employee mentor)
@@ -391,12 +468,19 @@ public class Intern : Employee
     }
 
     // Премия небольшая: 1000 ₽ + 1000 ₽ за каждую закрытую задачу, но не больше 5000 ₽.
-    public override decimal CalculateBonus() =>
-        Math.Min(5000m, 1000m + 1000m * CompletedTasks);
+    public override decimal CalculateBonus()
+    {
+        decimal bonus = 1000m + 1000m * CompletedTasks;
+        if (bonus > 5000m) bonus = 5000m;
+        return bonus;
+    }
 
     // Оплачиваем максимум 7 дней отпуска (учебное правило для стажёров).
-    public override decimal CalculateVacationPay(int days) =>
-        base.CalculateVacationPay(Math.Min(days, 7));
+    public override decimal CalculateVacationPay(int days)
+    {
+        if (days > 7) days = 7;
+        return base.CalculateVacationPay(days);
+    }
 
     // Стажёру нельзя давать крупные задачи (больше 8 часов).
     public override bool AssignTask(string title, int hours)
@@ -409,8 +493,13 @@ public class Intern : Employee
         return base.AssignTask(title, hours);   // остальные проверки — как у всех
     }
 
-    public override string GetInfo() =>
-        base.GetInfo() + $", наставник: {Mentor?.FullName ?? "не назначен"}, срок: {InternshipMonths} мес.";
+    public override string GetInfo()
+    {
+        string mentorName = "не назначен";
+        if (Mentor != null)
+            mentorName = Mentor.FullName;
+        return base.GetInfo() + $", наставник: {mentorName}, срок: {InternshipMonths} мес.";
+    }
 
     public void AskMentor(string question)
     {
@@ -420,11 +509,18 @@ public class Intern : Employee
             Console.WriteLine($"   {FullName} спрашивает {Mentor.FullName}: «{question}»");
     }
 
-    public void ExtendInternship(int months) =>
-        InternshipMonths = Math.Min(12, InternshipMonths + months);
+    public void ExtendInternship(int months)
+    {
+        int total = InternshipMonths + months;
+        if (total > 12) total = 12;
+        InternshipMonths = total;
+    }
 
     // Готов к найму, если закрыл хотя бы 2 задачи.
-    public bool IsReadyForOffer() => CompletedTasks >= 2;
+    public bool IsReadyForOffer()
+    {
+        return CompletedTasks >= 2;
+    }
 }
 
 // ============================================================
@@ -433,19 +529,30 @@ public class Intern : Employee
 // ============================================================
 public class Company
 {
-    private readonly List<Employee> _employees = new();
+    private List<Employee> _employees = new List<Employee>();
     private string _name;
 
     // Чтение и запись
     public string Name
     {
-        get => _name;
-        set => _name = string.IsNullOrWhiteSpace(value) ? _name : value.Trim();
+        get { return _name; }
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                _name = value.Trim();
+        }
     }
 
     // Только чтение
-    public int Count => _employees.Count;
-    public IReadOnlyList<Employee> Employees => _employees;
+    public int Count
+    {
+        get { return _employees.Count; }
+    }
+
+    public List<Employee> Employees
+    {
+        get { return new List<Employee>(_employees); }
+    }
 
     public decimal TotalPayroll
     {
@@ -460,18 +567,25 @@ public class Company
 
     public Company(string name)
     {
-        _name = string.IsNullOrWhiteSpace(name) ? "Компания" : name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            _name = "Компания";
+        else
+            _name = name.Trim();
     }
 
-    public void Hire(Employee employee) => _employees.Add(employee);
+    public void Hire(Employee employee)
+    {
+        _employees.Add(employee);
+    }
 
     public bool Fire(int id)
     {
-        var found = FindById(id);
-        return found != null && _employees.Remove(found);
+        Employee found = FindById(id);
+        if (found == null) return false;
+        return _employees.Remove(found);
     }
 
-    public Employee? FindById(int id)
+    public Employee FindById(int id)
     {
         foreach (var e in _employees)
             if (e.Id == id) return e;
@@ -499,13 +613,14 @@ public class Company
     public string BuildDepartmentReport()
     {
         var sb = new StringBuilder();   // StringBuilder — эффективная сборка длинной строки
-        sb.AppendLine($"ОТЧЁТ ПО ОТДЕЛАМ — {Name}");
+        sb.AppendLine("ОТЧЁТ ПО ОТДЕЛАМ — " + Name);
         sb.AppendLine(new string('=', 62));
 
         foreach (string dept in GetDepartments())
         {
-            sb.AppendLine($"Отдел «{dept}»");
-            sb.AppendLine($"{"ФИО",-28} {"Должность",-12} {"Оклад",12} {"Загр.",6}");
+            sb.AppendLine("Отдел «" + dept + "»");
+            sb.AppendLine("ФИО".PadRight(28) + " " + "Должность".PadRight(12) + " " +
+                          "Оклад".PadLeft(12) + " " + "Загр.".PadLeft(5));
 
             decimal payroll = 0;
             decimal bonuses = 0;
@@ -535,7 +650,7 @@ public class Company
 // ============================================================
 // ТОЧКА ВХОДА
 // ============================================================
-public static class Program
+public class Program
 {
     // Номер задачи — поменяй на свой, как в твоём задании.
     private const string TaskNumber = "1";
@@ -566,7 +681,7 @@ public static class Program
         var kozlov = new Intern("Козлов Артём Викторович", "Разработка", 40000m, petrova);
         var belova = new Intern("Белова Мария Романовна", "Мобильная разработка", 35000m, orlov, 6);
 
-        // Все — в один список. Тип списка Employee, но лежат разные потомки.
+        // Все — в один массив. Тип массива Employee, но лежат разные потомки.
         Employee[] all = { ivanov, smirnova, petrova, sidorov, orlov, kozlov, belova };
         foreach (var e in all)
             company.Hire(e);
@@ -620,7 +735,7 @@ public static class Program
             "   а считается он по-разному — зависит от реального типа объекта.");
 
         foreach (var e in all)
-            Console.WriteLine($"   {e.FullName,-28} {e.Position,-12} премия: {Employee.Money(e.CalculateBonus())}");
+            Console.WriteLine($"   {e.FullName.PadRight(28)} {e.Position.PadRight(12)} премия: {Employee.Money(e.CalculateBonus())}");
         Console.WriteLine($"   Всего на премии: {Employee.Money(company.TotalBonuses())}");
         Pause();
 
@@ -658,9 +773,10 @@ public static class Program
             "ТВОЁ ДЕЙСТВИЕ: введи число дней отпуска и нажми Enter (если ввести ерунду или ничего — возьмём 14).");
 
         Console.Write("   Дней отпуска: ");
-        string? input = Console.ReadLine();
-        // TryParse не падает на плохом вводе, а возвращает false. В Python пришлось бы try/except.
-        if (!int.TryParse(input, out int days) || days <= 0)
+        string input = Console.ReadLine();
+        // TryParse не падает на плохом вводе, а возвращает false.
+        int days;
+        if (!int.TryParse(input, out days) || days <= 0)
         {
             days = 14;
             Console.WriteLine("   Не разобрал число, берём 14 дней.");
@@ -668,7 +784,7 @@ public static class Program
 
         Console.WriteLine($"   Отпускные за {days} дн.:");
         foreach (var e in all)
-            Console.WriteLine($"   {e.FullName,-28} {e.Position,-12} {Employee.Money(e.CalculateVacationPay(days))}");
+            Console.WriteLine($"   {e.FullName.PadRight(28)} {e.Position.PadRight(12)} {Employee.Money(e.CalculateVacationPay(days))}");
         Console.WriteLine("   (у менеджера есть надбавка +10%, у стажёра оплачивается максимум 7 дней)");
         Pause();
 
@@ -685,7 +801,10 @@ public static class Program
         Console.WriteLine($"   После сокращения совещаний до 4 ч доступно часов: {ivanov.WeeklyHours}");
 
         kozlov.CompleteTask("Написать unit-тесты");   // уже закрыта -> false
-        Console.WriteLine($"   Стажёр {kozlov.FullName} готов к офферу? {(kozlov.IsReadyForOffer() ? "да" : "нет, закрыто мало задач")}");
+        string offerText = "нет, закрыто мало задач";
+        if (kozlov.IsReadyForOffer())
+            offerText = "да";
+        Console.WriteLine($"   Стажёр {kozlov.FullName} готов к офферу? {offerText}");
         kozlov.ExtendInternship(2);
         Console.WriteLine($"   Стажировку продлили, срок: {kozlov.InternshipMonths} мес.");
         Pause();
